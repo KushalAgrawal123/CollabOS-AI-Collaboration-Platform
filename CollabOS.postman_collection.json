@@ -1,0 +1,245 @@
+{
+  "info": {
+    "name": "CollabOS API",
+    "description": "Core API surface for CollabOS. Run 'Register' or 'Login' first -- both save the returned token into the {{token}} collection variable automatically, and every other request uses it via Bearer auth. Set {{orgId}}/{{projectId}}/{{taskId}}/{{documentId}} as you go, or add a small test script to auto-capture ids from create responses the same way login does for the token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api" },
+    { "key": "token", "value": "" },
+    { "key": "orgId", "value": "" },
+    { "key": "projectId", "value": "" },
+    { "key": "taskId", "value": "" },
+    { "key": "documentId", "value": "" },
+    { "key": "channelId", "value": "" },
+    { "key": "inviteToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('token', pm.response.json().token);"] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\",\n  \"password\": \"password123\"\n}" }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('token', pm.response.json().token);"] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"jane@example.com\",\n  \"password\": \"password123\"\n}" }
+          }
+        },
+        { "name": "Current user", "request": { "method": "GET", "url": "{{baseUrl}}/users/me" } }
+      ]
+    },
+    {
+      "name": "Organizations",
+      "item": [
+        {
+          "name": "Create organization",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('orgId', pm.response.json().id);"] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/organizations",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Acme Inc\"\n}" }
+          }
+        },
+        { "name": "List my organizations", "request": { "method": "GET", "url": "{{baseUrl}}/organizations" } },
+        { "name": "Get organization", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}" } }
+      ]
+    },
+    {
+      "name": "Members & Invites",
+      "item": [
+        { "name": "List members", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/members" } },
+        {
+          "name": "Change member role",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/members/1/role",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"ADMIN\"\n}" }
+          }
+        },
+        { "name": "Remove member", "request": { "method": "DELETE", "url": "{{baseUrl}}/organizations/{{orgId}}/members/1" } },
+        {
+          "name": "Create invite",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('inviteToken', pm.response.json().token);"] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/invites",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"newmember@example.com\",\n  \"role\": \"MEMBER\"\n}" }
+          }
+        },
+        { "name": "List invites", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/invites" } },
+        { "name": "Revoke invite", "request": { "method": "DELETE", "url": "{{baseUrl}}/organizations/{{orgId}}/invites/1" } },
+        { "name": "Accept invite (as invitee, different token)", "request": { "method": "POST", "url": "{{baseUrl}}/invites/{{inviteToken}}/accept" } }
+      ]
+    },
+    {
+      "name": "Projects",
+      "item": [
+        {
+          "name": "Create project",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('projectId', pm.response.json().id);"] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/projects",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Website Relaunch\",\n  \"description\": \"Q1 marketing site refresh\"\n}" }
+          }
+        },
+        { "name": "List projects", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/projects" } },
+        { "name": "Get project", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}" } },
+        { "name": "Delete project", "request": { "method": "DELETE", "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}" } }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "Create task",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('taskId', pm.response.json().id);"] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/tasks",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Draft homepage copy\",\n  \"description\": \"First pass for review\",\n  \"priority\": \"HIGH\",\n  \"dueDate\": \"2026-09-01\"\n}" }
+          }
+        },
+        { "name": "List tasks", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/tasks" } },
+        {
+          "name": "Update task",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/tasks/{{taskId}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Draft homepage copy (v2)\",\n  \"status\": \"IN_PROGRESS\"\n}" }
+          }
+        },
+        {
+          "name": "Reorder tasks",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/tasks/reorder",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"IN_PROGRESS\",\n  \"taskIds\": [{{taskId}}]\n}" }
+          }
+        },
+        { "name": "Delete task", "request": { "method": "DELETE", "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/tasks/{{taskId}}" } },
+        { "name": "List task comments", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/tasks/{{taskId}}/comments" } },
+        {
+          "name": "Add task comment",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/tasks/{{taskId}}/comments",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"content\": \"Looks good, one nit in paragraph 2.\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Upload document",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('documentId', pm.response.json().id);"] } }],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/documents",
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "" }, { "key": "taskId", "value": "", "type": "text", "disabled": true }] }
+          }
+        },
+        { "name": "List documents", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/documents" } },
+        { "name": "Download document", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/documents/{{documentId}}/download" } },
+        { "name": "Delete document", "request": { "method": "DELETE", "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/documents/{{documentId}}" } }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        { "name": "List channels", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/channels" } },
+        {
+          "name": "Create channel",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/channels",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"general\"\n}" }
+          }
+        },
+        {
+          "name": "Open/create a DM channel",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/channels/direct",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": 2\n}" }
+          }
+        },
+        { "name": "List messages", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/channels/{{channelId}}/messages" } },
+        {
+          "name": "Send message",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/channels/{{channelId}}/messages",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"content\": \"Hey team \\ud83d\\udc4b\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        { "name": "List notifications", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/notifications" } },
+        { "name": "Unread count", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/notifications/unread-count" } },
+        { "name": "Mark one read", "request": { "method": "POST", "url": "{{baseUrl}}/organizations/{{orgId}}/notifications/1/read" } },
+        { "name": "Mark all read", "request": { "method": "POST", "url": "{{baseUrl}}/organizations/{{orgId}}/notifications/read-all" } }
+      ]
+    },
+    {
+      "name": "AI",
+      "item": [
+        { "name": "AI status", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/ai/status" } },
+        {
+          "name": "Ask (Document Assistant Agent)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/ai/ask",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"question\": \"What does the spec say about authentication?\"\n}" }
+          }
+        },
+        { "name": "Project Manager Agent report", "request": { "method": "POST", "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/ai/project-manager" } },
+        { "name": "Summarize document", "request": { "method": "POST", "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/documents/{{documentId}}/ai/summarize" } },
+        {
+          "name": "Submit feedback",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/ai/feedback",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"agentType\": \"DOCUMENT_ASSISTANT\",\n  \"question\": \"What does the spec say about authentication?\",\n  \"answer\": \"...\",\n  \"rating\": \"UP\",\n  \"correction\": null\n}" }
+          }
+        },
+        { "name": "List feedback (OWNER/ADMIN only)", "request": { "method": "GET", "url": "{{baseUrl}}/organizations/{{orgId}}/projects/{{projectId}}/ai/feedback" } }
+      ]
+    }
+  ]
+}

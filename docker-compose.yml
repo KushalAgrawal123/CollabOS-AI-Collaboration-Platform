@@ -1,0 +1,106 @@
+name: collabos
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: collabos
+      POSTGRES_USER: collabos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-collabos}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres-init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U collabos -d collabos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Single-node KRaft mode -- no Zookeeper, consistent with the local dev setup.
+  kafka:
+    image: bitnami/kafka:3.7
+    environment:
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/bitnami/kafka
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/collabos
+      SPRING_DATASOURCE_USERNAME: collabos
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-collabos}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      APP_STORAGE_ROOT_DIR: /app/uploads
+      APP_AISERVICE_URL: http://ai-service:8000
+      APP_CORS_ALLOWED_ORIGIN: http://localhost:5173
+      # Set JWT_SECRET in a root .env file to override the app's dev-only
+      # default (see application.properties) -- never hardcode it here.
+      JWT_SECRET: ${JWT_SECRET:-}
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "8080:8080"
+
+  ai-service:
+    build: ./ai-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://collabos:${POSTGRES_PASSWORD:-collabos}@postgres:5432/collabos
+      UPLOADS_DIR: /app/uploads
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # All empty by default -- the AI layer stays "not configured" (and the
+      # rest of the app unaffected) until you set your own key here or in a
+      # root .env file. See ai-service/.env.example for the full list.
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-llama-3.1-8b-instant}
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  pgdata:
+  kafka_data:
+  uploads_data:
